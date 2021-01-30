@@ -36,6 +36,11 @@ class Vgg19(nn.Module):
         self._mean = nn.Parameter(mean, requires_grad=False)
         self._std = nn.Parameter(std, requires_grad=False)
 
+        for p in self.parameters():
+            p.requires_grad = False
+
+        self.eval()
+
     # pylint: disable=arguments-differ
     def forward(self, img: Tensor) -> List[Tensor]:
         img = (img - self._mean) / self._std
