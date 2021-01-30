@@ -1,7 +1,8 @@
 -f https://download.pytorch.org/whl/torch_stable.html
 
-numpy==1.19.5
 Pillow==8.1.0
+fire==0.4.0
+numpy==1.19.5
 six==1.15.0
 torch===1.7.1
 torchvision===0.8.2

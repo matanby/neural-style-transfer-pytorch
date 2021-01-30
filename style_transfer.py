@@ -14,14 +14,23 @@ from vgg import Vgg19
 
 @dataclass
 class StyleTransferConfig:
-    lambda_style: float = 10  # good range: 10 - 100_000
+    lambda_style: float = 100  # good range: 10 - 100_000
     lambda_tv: float = 10  # good range: 0 - 1_000
     step_size: float = 0.1
-    iterations: int = 1000
+    iterations: int = 500
     content_block_weights: Tuple[float] = (0.0, 0.0, 0.0, 1.0, 0.0)
     style_block_weights: Tuple[float] = (1/5, 1/5, 1/5, 1/5, 1/5)
     random_initial_image: bool = False
     max_input_dim: int = 512
+    save_interval: int = 50
+
+    def update(self, **kwargs) -> 'StyleTransferConfig':
+        for key, value in kwargs.items():
+            if key in self.__dict__:
+                setattr(self, key, value)
+            else:
+                raise KeyError(f'Unknown configuration value: "{key}"')
+        return self
 
 
 class StyleTransfer:
@@ -38,9 +47,11 @@ class StyleTransfer:
         config: Optional[StyleTransferConfig] = None,
     ) -> np.ndarray:
 
+        config = config or StyleTransferConfig()
+        print(config)
+
         content_t = self._preprocess(content, config.max_input_dim)
         style_t = self._preprocess(style, config.max_input_dim)
-        config = config or StyleTransferConfig()
 
         if config.random_initial_image:
             opt_t = torch.rand(
@@ -50,7 +61,7 @@ class StyleTransfer:
                 requires_grad=True,
             )
         else:
-            opt_t = torch.tensor(content_t.data.clone(), requires_grad=True)
+            opt_t = content_t.clone().requires_grad_(True)
 
         with torch.no_grad():
             content_features = self._vgg(content_t)
@@ -58,15 +69,15 @@ class StyleTransfer:
 
         self._opt = torch.optim.Adam([opt_t], lr=config.step_size)
 
-        prog_bar = tqdm(range(config.iterations))
+        prog_bar = tqdm(range(1, config.iterations + 1))
         for i in prog_bar:
             loss = self._step(content_features, style_features, opt_t, config)
             mean_grad = opt_t.grad.abs().mean().item()
             prog_bar.set_description(f'Loss: {loss:.2f}, mean grad: {mean_grad:.7f}')
 
-            if i % 50 == 0:
+            if i % config.save_interval == 0:
                 opt = self._postprocess(opt_t)
-                image_utils.save(opt, f'outputs/opt_{i}.jpg')
+                image_utils.save(opt, f'images/progress/opt_{i}.jpg')
 
         opt = self._postprocess(opt_t)
         return opt
