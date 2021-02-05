@@ -13,7 +13,10 @@ from vgg import Vgg19
 
 
 @dataclass
-class StyleTransferConfig:
+class StylizerConfig:
+    # the weight of the content term in the total loss.
+    lambda_content: float = 1
+
     # the weight of the style term in the total loss.
     # empirically good range: 10 - 100_000
     lambda_style: float = 100
@@ -53,7 +56,7 @@ class StyleTransferConfig:
     # result of the stylized image will be saved to the disk.
     save_interval: int = 50
 
-    def update(self, **kwargs) -> 'StyleTransferConfig':
+    def update(self, **kwargs) -> 'StylizerConfig':
         for key, value in kwargs.items():
             if key in self.__dict__:
                 setattr(self, key, value)
@@ -62,7 +65,7 @@ class StyleTransferConfig:
         return self
 
 
-class StyleTransfer:
+class Stylizer:
     """
     A class that generates stylized images using the method presented in
     "A Neural Algorithm of Artistic Style" by Gatys et. al (2015)
@@ -75,11 +78,11 @@ class StyleTransfer:
         self._vgg = Vgg19(use_avg_pooling=True).to(self._device)
         self._opt = None
 
-    def transfer(
+    def stylize(
         self,
         content: np.ndarray,
         style: np.ndarray,
-        config: Optional[StyleTransferConfig] = None,
+        config: Optional[StylizerConfig] = None,
     ) -> np.ndarray:
         """
         Creates a stylized image in which the content is taken from the input
@@ -90,7 +93,7 @@ class StyleTransfer:
         :return: The generated stylized image: np.ndarray of shape (h, w, 3) in range [0, 1].
         """
 
-        config = config or StyleTransferConfig()
+        config = config or StylizerConfig()
         print(config)
 
         content_t = self._preprocess(content, config.max_input_dim)
@@ -148,14 +151,14 @@ class StyleTransfer:
         content_features: List[Tensor],
         style_features: List[Tensor],
         opt_t: Tensor,
-        config: StyleTransferConfig,
+        config: StylizerConfig,
     ) -> float:
 
         opt_features = self._vgg(opt_t)
         content_loss = self._content_loss(opt_features, content_features, config.content_block_weights)
         style_loss = self._style_loss(opt_features, style_features, config.style_block_weights)
         tv_loss = self._tv_loss(opt_t)
-        loss = content_loss + style_loss * config.lambda_style + config.lambda_tv * tv_loss
+        loss = content_loss * config.lambda_content + style_loss * config.lambda_style + config.lambda_tv * tv_loss
         self._opt.zero_grad()
         loss.backward()
         self._opt.step()
@@ -192,8 +195,8 @@ class StyleTransfer:
         num_features = len(features_input)
         for i in range(num_features):
             if weights[i] > 0:
-                gram_input = StyleTransfer._gram_matrix(features_input[i])
-                gram_target = StyleTransfer._gram_matrix(features_target[i])
+                gram_input = Stylizer._gram_matrix(features_input[i])
+                gram_target = Stylizer._gram_matrix(features_target[i])
                 block_loss = F.mse_loss(gram_input, gram_target)
                 total = total + block_loss * weights[i]
 
