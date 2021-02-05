@@ -5,8 +5,6 @@ from torchvision import models
 
 
 class Vgg19(nn.Module):
-    # from: https://github.com/NVIDIA/pix2pixHD/blob/master/models/networks.py#L386
-
     def __init__(self, use_avg_pooling: bool = False):
         super(Vgg19, self).__init__()
         layers = models.vgg19(pretrained=True).features
@@ -41,7 +39,6 @@ class Vgg19(nn.Module):
 
         self.eval()
 
-    # pylint: disable=arguments-differ
     def forward(self, img: Tensor) -> List[Tensor]:
         img = (img - self._mean) / self._std
         h_relu1 = self.block1(img)

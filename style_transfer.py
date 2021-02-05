@@ -14,14 +14,43 @@ from vgg import Vgg19
 
 @dataclass
 class StyleTransferConfig:
-    lambda_style: float = 100  # good range: 10 - 100_000
-    lambda_tv: float = 10  # good range: 0 - 1_000
+    # the weight of the style term in the total loss.
+    # empirically good range: 10 - 100_000
+    lambda_style: float = 100
+
+    # the weight of the generate image's total variation
+    # in the total loss. empirically good range: 0 - 1_000.
+    lambda_tv: float = 10
+
+    # the size of each step of the optimization process.
     step_size: float = 0.1
+
+    # number of optimization iterations.
     iterations: int = 500
+
+    # the weight of each convolutional block in the content loss.
+    # These five numbers refer to the following five activations of
+    # the VGG19 model: conv1_1, conv2_1, conv3_1, conv4_1, conv5_1.
     content_block_weights: Tuple[float] = (0.0, 0.0, 0.0, 1.0, 0.0)
+
+    # the weight of each convolutional block in the style loss.
+    # These five numbers refer to the following five activations of
+    # the VGG19 model: conv1_1, conv2_1, conv3_1, conv4_1, conv5_1.
     style_block_weights: Tuple[float] = (1/5, 1/5, 1/5, 1/5, 1/5)
+
+    # whether or not the optimization process should start with a
+    # random initial image (True), or the input content image (False).
     random_initial_image: bool = False
+
+    # the maximal allowed input image dimension. input images of
+    # which max(H,W) is larger than this number will be downscaled appropriately.
+    # this also defines the dimension of the generated stylized image.
+    # Raising this value will allow creating larger stylized images, but
+    # will also require more time and memory.
     max_input_dim: int = 512
+
+    # the interval (number of iterations) after which an intermediate
+    # result of the stylized image will be saved to the disk.
     save_interval: int = 50
 
     def update(self, **kwargs) -> 'StyleTransferConfig':
@@ -34,6 +63,12 @@ class StyleTransferConfig:
 
 
 class StyleTransfer:
+    """
+    A class that generates stylized images using the method presented in
+    "A Neural Algorithm of Artistic Style" by Gatys et. al (2015)
+    Paper: https://arxiv.org/abs/1508.06576.
+    """
+
     def __init__(self, use_gpu: bool = True):
         gpu_available = torch.cuda.is_available()
         self._device = 'cuda' if use_gpu and gpu_available else 'cpu'
@@ -46,6 +81,14 @@ class StyleTransfer:
         style: np.ndarray,
         config: Optional[StyleTransferConfig] = None,
     ) -> np.ndarray:
+        """
+        Creates a stylized image in which the content is taken from the input
+        content image, and the style is taken from the input style image.
+        :param content: The content image: np.ndarray of shape (h, w, 3) in range [0, 1].
+        :param style: The style image: np.ndarray of shape (h, w, 3) in range [0, 1].
+        :param config: (optional) an instance of `StyleTransferConfig`.
+        :return: The generated stylized image: np.ndarray of shape (h, w, 3) in range [0, 1].
+        """
 
         config = config or StyleTransferConfig()
         print(config)
@@ -157,9 +200,9 @@ class StyleTransfer:
         return total
 
     @staticmethod
-    def _tv_loss(image_t: Tensor) -> Tensor:
-        tv_loss = (image_t[:, :, :, :-1] - image_t[:, :, :, 1:]).abs().mean() + \
-                  (image_t[:, :, :-1, :] - image_t[:, :, 1:, :]).abs().mean()
+    def _tv_loss(image: Tensor) -> Tensor:
+        tv_loss = (image[:, :, :, :-1] - image[:, :, :, 1:]).abs().mean() + \
+                  (image[:, :, :-1, :] - image[:, :, 1:, :]).abs().mean()
 
         return tv_loss
 
