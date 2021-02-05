@@ -21,7 +21,7 @@ class StylizerConfig:
     # empirically good range: 10 - 100_000
     lambda_style: float = 100
 
-    # the weight of the generate image's total variation
+    # the weight of the generated image's total variation
     # in the total loss. empirically good range: 0 - 1_000.
     lambda_tv: float = 10
 
